@@ -1,3 +1,12 @@
+use yew::prelude::*;
+
+#[function_component]
+fn App() -> Html {
+    html! {
+        <div id="chat"></div>
+    }
+}
+
 fn main() {
-    println!("Hello, world!");
+    yew::Renderer::<App>::new().render();
 }
