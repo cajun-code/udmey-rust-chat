@@ -1,22 +1,39 @@
 use std::{sync::atomic::{AtomicUsize, Ordering}, collections::HashMap};
-use rocket::State;
-use rocket::futures::{StreamExt, stream::SplitSink};
+use rocket::{State, tokio::sync::Mutex};
+use rocket::futures::{SinkExt, StreamExt, stream::SplitSink};
 use rocket_ws::{WebSocket, Channel, stream::DuplexStream, Message};
 
 static USER_ID_COUNTER: AtomicUsize = AtomicUsize::new(1);
 
 #[derive(Default)]
 struct ChatRoom {
-    connections: HashMap<usize, SplitSink<DuplexStream, Message>>
+    connections: Mutex<HashMap<usize, SplitSink<DuplexStream, Message>>>
 }
 
 #[rocket::get("/")]
-fn chat(ws: WebSocket, state: &State<ChatRoom>) -> Channel<'static> {
+fn chat<'r>(ws: WebSocket, state: &'r State<ChatRoom>) -> Channel<'r> {
     ws.channel(move |stream| Box::pin(async move {
         let user_id = USER_ID_COUNTER.fetch_add(1, Ordering::Relaxed);
-        let (mut ws_sink, mut ws_stream) = stream.split();
+        let (ws_sink, mut ws_stream) = stream.split();
+        {
+            let mut conns = state.connections.lock().await;
+            conns.insert(user_id, ws_sink);
+        }
+
+
         while let Some(message) = ws_stream.next().await {
-            // let _ = ws_sink.send(message?).await;
+            {
+                let mut conns = state.connections.lock().await;
+                let msg = message?;
+                for (_id, sink) in conns.iter_mut() {
+                    let _ = sink.send(msg.clone()).await;
+                }
+            }
+        }
+
+        {
+            let mut conns = state.connections.lock().await;
+            conns.remove(&user_id);
         }
 
         Ok(())
