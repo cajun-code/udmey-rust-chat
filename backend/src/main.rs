@@ -1,5 +1,6 @@
 use std::{sync::atomic::{AtomicUsize, Ordering}, collections::HashMap};
 use chrono::Utc;
+use common::WebSocketMessage;
 use rocket::{State, tokio::sync::Mutex};
 use rocket::futures::{SinkExt, StreamExt, stream::SplitSink};
 use rocket_ws::{WebSocket, Channel, stream::DuplexStream, Message};
@@ -24,10 +25,15 @@ impl ChatRoom {
             author: format!("User #{}", author_id),
             created_at: Utc::now().naive_utc(),
         };
+        let websocket_message = WebSocketMessage {
+            message_type: common::WebSocketMessageType::NewMessage,
+            message: Some(chat_message),
+            users: None,
+        };
         let mut conns = self.connections.lock().await;
         for (_id, sink) in conns.iter_mut() {
             let _ = sink.send(
-                Message::Text(json!(chat_message).to_string())
+                Message::Text(json!(websocket_message).to_string())
             ).await;
         }
     }
