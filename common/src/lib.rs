@@ -14,7 +14,7 @@ pub struct WebSocketMessage {
     pub users: Option<Vec<String>>,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, PartialEq)]
 pub struct ChatMessage {
     pub message: String,
     pub author: String,
