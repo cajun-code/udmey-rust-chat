@@ -8,3 +8,8 @@ edition = "2021"
 [dependencies]
 rocket = "0.5"
 rocket_ws = "0.1"
+
+common = { path = "../common" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
