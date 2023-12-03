@@ -407,6 +407,10 @@ dependencies = [
 name = "frontend"
 version = "0.1.0"
 dependencies = [
+ "chrono",
+ "common",
+ "serde",
+ "serde_json",
  "web-sys",
  "yew",
  "yew-hooks",

@@ -1,7 +1,7 @@
 use chrono::NaiveDateTime;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct ChatMessage {
     pub message: String,
     pub author: String,
