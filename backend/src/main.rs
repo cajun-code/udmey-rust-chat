@@ -11,19 +11,46 @@ static USER_ID_COUNTER: AtomicUsize = AtomicUsize::new(1);
 
 #[derive(Default)]
 struct ChatRoom {
-    connections: Mutex<HashMap<usize, SplitSink<DuplexStream, Message>>>
+    connections: Mutex<HashMap<usize, ChatRoomConnection>>
+}
+
+struct ChatRoomConnection {
+    username: String,
+    sink: SplitSink<DuplexStream, Message>,
 }
 
 impl ChatRoom {
     pub async fn add(&self, id: usize, sink: SplitSink<DuplexStream, Message>) {
         let mut conns = self.connections.lock().await;
-        conns.insert(id, sink);
+        let connection = ChatRoomConnection {
+            username: format!("User #{}", id),
+            sink
+        };
+        conns.insert(id, connection);
+    }
+
+    pub async fn send_username(&self, id: usize) {
+        let mut conns = self.connections.lock().await;
+        let connection = conns.get_mut(&id).unwrap();
+
+        let websocket_message = WebSocketMessage {
+            message_type: WebSocketMessageType::UsernameChange,
+            message: None,
+            username: Some(connection.username.clone()),
+            users: None,
+        };
+
+        let _ = connection.sink.send(
+            Message::Text(json!(websocket_message).to_string())
+        ).await;
     }
 
     pub async fn broadcast_message(&self, message: Message, author_id: usize) {
+        let mut conns = self.connections.lock().await;
+        let connection = conns.get(&author_id).unwrap();
         let chat_message = ChatMessage {
             message: message.to_string(),
-            author: format!("User #{}", author_id),
+            author: connection.username.clone(),
             created_at: Utc::now().naive_utc(),
         };
         let websocket_message = WebSocketMessage {
@@ -32,9 +59,9 @@ impl ChatRoom {
             username: None,
             users: None,
         };
-        let mut conns = self.connections.lock().await;
-        for (_id, sink) in conns.iter_mut() {
-            let _ = sink.send(
+
+        for (_id, connection) in conns.iter_mut() {
+            let _ = connection.sink.send(
                 Message::Text(json!(websocket_message).to_string())
             ).await;
         }
@@ -44,8 +71,8 @@ impl ChatRoom {
         let mut conns = self.connections.lock().await;
         let mut users = vec![];
 
-        for (id, _) in conns.iter() {
-            users.push(format!("User #{}", id));
+        for (_id, connection) in conns.iter() {
+            users.push(connection.username.clone());
         }
 
         let websocket_message = WebSocketMessage {
@@ -55,8 +82,8 @@ impl ChatRoom {
             users: Some(users),
         };
 
-        for (_id, sink) in conns.iter_mut() {
-            let _ = sink.send(
+        for (_id, connection) in conns.iter_mut() {
+            let _ = connection.sink.send(
                 Message::Text(json!(websocket_message).to_string())
             ).await;
         }
@@ -75,6 +102,7 @@ fn chat<'r>(ws: WebSocket, state: &'r State<ChatRoom>) -> Channel<'r> {
         let (ws_sink, mut ws_stream) = stream.split();
         state.add(user_id, ws_sink).await;
         state.broadcast_user_list().await;
+        state.send_username(user_id).await;
 
         while let Some(message) = ws_stream.next().await {
             state.broadcast_message(message?, user_id).await;
