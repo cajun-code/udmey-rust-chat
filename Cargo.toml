@@ -4,3 +4,8 @@ members = [
     "frontend",
     "common",
 ]
+
+[workspace.dependencies]
+serde = "1.0"
+serde_json = "1.0"
+chrono = "0.4"

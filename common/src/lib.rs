@@ -1,14 +1,7 @@
-pub fn add(left: usize, right: usize) -> usize {
-    left + right
-}
+use chrono::NaiveDateTime;
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
+pub struct ChatMessage {
+    pub message: String,
+    pub author: String,
+    pub created_at: NaiveDateTime
 }
