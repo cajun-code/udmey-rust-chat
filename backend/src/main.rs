@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use chrono::Utc;
 use common::*;
 use rocket::{State, tokio::sync::Mutex};
 use rocket::futures::{SinkExt, StreamExt, stream::SplitSink};
@@ -45,9 +46,24 @@ impl ChatRoom {
     }
 
     pub async fn change_username(&self, new_username: String, id: usize) {
-        let mut conns = self.connections.lock().await;
-        if let Some(connection) = conns.get_mut(&id) {
-            connection.username = new_username;
+        let result = {
+            let mut conns = self.connections.lock().await;
+            if let Some(connection) = conns.get_mut(&id) {
+                let old_username = connection.username.clone();
+                connection.username = new_username.clone();
+                Some(old_username)
+            } else {
+                None
+            }
+        };
+
+        if let Some(old_username) = result {
+            let message = ChatMessage {
+                message: format!("User {} changed username to {}", old_username, new_username),
+                author: "System".to_string(), 
+                created_at: Utc::now().naive_utc(),
+            };
+            Self::broadcast_message(&self, message).await;
         }
     }
 
